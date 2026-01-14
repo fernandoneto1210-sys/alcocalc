@@ -1,373 +1,392 @@
+// src/components/Calculator.jsx
 import React, { useState, useEffect } from 'react';
-import { Plus, X, ArrowRight, Calculator as CalcIcon } from 'lucide-react';
-import { calculateEquivalence, calculatePureAlcohol } from '../utils/alcoholCalculations';
+import { Calculator as CalcIcon, Plus, X, Users, Edit, Trash2 } from 'lucide-react';
 import { defaultDrinks } from '../data/defaultDrinks';
+import { calculateEquivalence } from '../utils/alcoholCalculations';
 
-const Calculator = ({ onCalculate, gender, setGender }) => {
-  const [drinks, setDrinks] = useState([]);
+export default function Calculator({ onCalculate }) {
+  const [drinks, setDrinks] = useState(defaultDrinks);
   const [fromDrink, setFromDrink] = useState(null);
   const [toDrink, setToDrink] = useState(null);
-  const [fromVolume, setFromVolume] = useState(150);
-  const [toVolume, setToVolume] = useState(350);
-  const [result, setResult] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [volume, setVolume] = useState('');
+  const [gender, setGender] = useState('male');
+  const [showAddDrink, setShowAddDrink] = useState(false);
   const [newDrink, setNewDrink] = useState({
     name: '',
     percentage: '',
-    volume: '',
-    icon: '🍹'
+    icon: '🍺',
+    caloriesPer100ml: ''
   });
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [editingDrink, setEditingDrink] = useState(null);
 
   useEffect(() => {
-    const savedDrinks = localStorage.getItem('customDrinks');
-    const customDrinks = savedDrinks ? JSON.parse(savedDrinks) : [];
-    const allDrinks = [...defaultDrinks, ...customDrinks];
-    setDrinks(allDrinks);
-    setFromDrink(allDrinks[2]);
-    setToDrink(allDrinks[0]);
+    const saved = localStorage.getItem('customDrinks');
+    if (saved) {
+      const customDrinks = JSON.parse(saved);
+      setDrinks([...defaultDrinks, ...customDrinks]);
+    }
   }, []);
-
-  const handleCalculate = () => {
-    if (!fromDrink || !toDrink) return;
-
-    const equivalence = calculateEquivalence(
-      fromVolume,
-      fromDrink.percentage,
-      toVolume,
-      toDrink.percentage
-    );
-
-    const pureAlcoholFrom = calculatePureAlcohol(fromVolume, fromDrink.percentage);
-
-    const resultData = {
-      from: {
-        name: fromDrink.name,
-        volume: fromVolume,
-        percentage: fromDrink.percentage,
-        icon: fromDrink.icon
-      },
-      to: {
-        name: toDrink.name,
-        volume: toVolume,
-        percentage: toDrink.percentage,
-        icon: toDrink.icon
-      },
-      equivalence: equivalence.toFixed(2),
-      pureAlcohol: pureAlcoholFrom.toFixed(2),
-      timestamp: new Date().toISOString()
-    };
-
-    setResult(resultData);
-    onCalculate(resultData);
-  };
 
   const selectDrink = (drink, type) => {
     if (type === 'from') {
       setFromDrink(drink);
-      setFromVolume(drink.standardVolume);
     } else {
       setToDrink(drink);
-      setToVolume(drink.standardVolume);
     }
   };
 
   const handleAddDrink = () => {
-    if (!newDrink.name || !newDrink.percentage || !newDrink.volume) {
-      alert('Preencha todos os campos!');
+    if (!newDrink.name || !newDrink.percentage) {
+      alert('Nome e porcentagem de álcool são obrigatórios.');
       return;
     }
 
-    const customDrink = {
-      id: Date.now(),
-      name: newDrink.name,
-      type: 'Personalizada',
-      percentage: parseFloat(newDrink.percentage),
-      standardVolume: parseInt(newDrink.volume),
-      icon: newDrink.icon,
-      isCustom: true
-    };
+    let calories = parseFloat(newDrink.caloriesPer100ml);
+    if (isNaN(calories)) {
+      const nameLower = newDrink.name.toLowerCase();
+      if (nameLower.includes('cerveja') || nameLower.includes('pilsen') || nameLower.includes('lager')) {
+        calories = 43;
+      } else if (nameLower.includes('vinho')) {
+        calories = 85;
+      } else if (nameLower.includes('whisky') || nameLower.includes('vodka') || nameLower.includes('cachaça') || nameLower.includes('tequila') || nameLower.includes('gin')) {
+        calories = 231;
+      } else if (nameLower.includes('caipirinha') || nameLower.includes('drink') || nameLower.includes('coquetel')) {
+        calories = 160;
+      } else {
+        calories = 70;
+      }
+    }
 
-    const savedDrinks = localStorage.getItem('customDrinks');
-    const customDrinks = savedDrinks ? JSON.parse(savedDrinks) : [];
-    const updatedCustomDrinks = [...customDrinks, customDrink];
+    if (editingDrink) {
+      const updatedDrinks = drinks.map(d =>
+        d.id === editingDrink.id
+          ? {
+              ...d,
+              name: newDrink.name,
+              percentage: parseFloat(newDrink.percentage),
+              icon: newDrink.icon,
+              caloriesPer100ml: calories
+            }
+          : d
+      );
+      const customDrinks = updatedDrinks.filter(d => d.isCustom);
+      localStorage.setItem('customDrinks', JSON.stringify(customDrinks));
+      setDrinks(updatedDrinks);
+      setEditingDrink(null);
+    } else {
+      const customDrink = {
+        id: Date.now(),
+        name: newDrink.name,
+        percentage: parseFloat(newDrink.percentage),
+        icon: newDrink.icon,
+        caloriesPer100ml: calories,
+        isCustom: true
+      };
+      const customDrinks = drinks.filter(d => d.isCustom);
+      customDrinks.push(customDrink);
+      localStorage.setItem('customDrinks', JSON.stringify(customDrinks));
+      setDrinks([...defaultDrinks, ...customDrinks]);
+    }
 
-    localStorage.setItem('customDrinks', JSON.stringify(updatedCustomDrinks));
-
-    const allDrinks = [...defaultDrinks, ...updatedCustomDrinks];
-    setDrinks(allDrinks);
-
-    setNewDrink({ name: '', percentage: '', volume: '', icon: '🍹' });
-    setShowAddForm(false);
+    setNewDrink({ name: '', percentage: '', icon: '🍺', caloriesPer100ml: '' });
+    setShowAddDrink(false);
   };
 
-  const handleDeleteDrink = (drinkId) => {
-    const savedDrinks = localStorage.getItem('customDrinks');
-    const customDrinks = savedDrinks ? JSON.parse(savedDrinks) : [];
-    const updated = customDrinks.filter(d => d.id !== drinkId);
-
-    localStorage.setItem('customDrinks', JSON.stringify(updated));
-
-    const allDrinks = [...defaultDrinks, ...updated];
-    setDrinks(allDrinks);
+  const handleEditClick = (drink) => {
+    setEditingDrink(drink);
+    setNewDrink({
+      name: drink.name,
+      percentage: drink.percentage.toString(),
+      icon: drink.icon,
+      caloriesPer100ml: drink.caloriesPer100ml.toString()
+    });
+    setShowAddDrink(true);
   };
 
-  const icons = ['🍺', '🍷', '🥂', '🍾', '🥃', '🍸', '🍹', '🧃', '🥤', '☕'];
+  const handleDeleteDrink = (idToDelete) => {
+    if (window.confirm('Tem certeza que deseja excluir esta bebida personalizada?')) {
+      const updatedDrinks = drinks.filter(d => d.id !== idToDelete);
+      const customDrinks = updatedDrinks.filter(d => d.isCustom);
+      localStorage.setItem('customDrinks', JSON.stringify(customDrinks));
+      setDrinks([...defaultDrinks, ...customDrinks]);
+
+      if (fromDrink && fromDrink.id === idToDelete) setFromDrink(null);
+      if (toDrink && toDrink.id === idToDelete) setToDrink(null);
+    }
+  };
+
+  const handleCalculate = () => {
+    if (!fromDrink || !toDrink || !volume) {
+      alert('Por favor, selecione as bebidas e digite o volume.');
+      return;
+    }
+
+    setIsCalculating(true);
+    setTimeout(() => {
+      const result = calculateEquivalence(parseFloat(volume), fromDrink, toDrink, gender);
+      onCalculate(result, fromDrink, toDrink, parseFloat(volume));
+      setIsCalculating(false);
+    }, 500);
+  };
 
   return (
-    <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-5xl mx-auto">
-      {/* HEADER */}
-      <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-purple-600 to-purple-500 p-3 rounded-xl">
-            <CalcIcon className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Calculadora</h1>
-            <p className="text-sm text-gray-500">Compare equivalências alcoólicas</p>
-          </div>
-        </div>
+    <div className="max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl">
+      <h1 className="text-4xl font-extrabold text-center text-purple-800 mb-8">
+        Calculadora de Equivalência de Álcool
+      </h1>
 
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg px-4 py-2 transition-all flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Adicionar Bebida
-        </button>
-      </div>
-
-      {/* SELEÇÃO DE NOMES */}
-<div className="grid md:grid-cols-2 gap-4 mb-6 pb-6 border-b border-gray-200">
-  <div className="space-y-2">
-    <label className="text-sm font-semibold text-gray-700">Seu nome:</label>
-    <input
-      type="text"
-      placeholder="Digite seu nome"
-      className="input-styled input-from"
-    />
-  </div>
-  <div className="space-y-2">
-    <label className="text-sm font-semibold text-gray-700">Nome do acompanhante:</label>
-    <input
-      type="text"
-      placeholder="Digite o nome (opcional)"
-      className="input-styled input-to"
-    />
-  </div>
-</div>
-      {/* FORMULÁRIO ADICIONAR BEBIDA */}
-      {showAddForm && (
-        <div className="mb-6 p-6 bg-cyan-50 rounded-2xl border-2 border-cyan-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-800">Nova Bebida Personalizada</h3>
-            <button 
-              onClick={() => setShowAddForm(false)} 
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-4 mb-4">
-            <input
-              type="text"
-              value={newDrink.name}
-              onChange={(e) => setNewDrink({...newDrink, name: e.target.value})}
-              placeholder="Nome da bebida"
-              className="w-full px-4 py-3 border-2 border-cyan-300 rounded-xl focus:border-cyan-500 focus:outline-none"
-            />
-            <input
-              type="number"
-              value={newDrink.percentage}
-              onChange={(e) => setNewDrink({...newDrink, percentage: e.target.value})}
-              placeholder="Teor (%)"
-              step="0.1"
-              className="w-full px-4 py-3 border-2 border-cyan-300 rounded-xl focus:border-cyan-500 focus:outline-none"
-            />
-            <input
-              type="number"
-              value={newDrink.volume}
-              onChange={(e) => setNewDrink({...newDrink, volume: e.target.value})}
-              placeholder="Volume (ml)"
-              className="w-full px-4 py-3 border-2 border-cyan-300 rounded-xl focus:border-cyan-500 focus:outline-none"
-            />
-            <select
-              value={newDrink.icon}
-              onChange={(e) => setNewDrink({...newDrink, icon: e.target.value})}
-              className="w-full px-4 py-3 border-2 border-cyan-300 rounded-xl focus:border-cyan-500 focus:outline-none text-lg"
-            >
-              {icons.map(icon => (
-                <option key={icon} value={icon}>{icon}</option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            onClick={handleAddDrink}
-            className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg px-4 py-2 transition-all"
-          >
-            Salvar Bebida
-          </button>
-        </div>
-      )}
-
-      {/* CALCULADORA - DUAS COLUNAS */}
-      <div className="grid md:grid-cols-2 gap-8 mb-8">
-        {/* COLUNA DE: */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-1 h-8 bg-gradient-to-b from-purple-600 to-purple-400 rounded-full"></div>
-            <h2 className="text-2xl font-bold text-gray-800">De:</h2>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 max-h-64 overflow-y-auto pr-2">
-            {drinks.map(drink => (
-              <div key={drink.id} className="relative group">
-                <button
-                  onClick={() => selectDrink(drink, 'from')}
-                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                    fromDrink?.id === drink.id
-                      ? 'border-purple-500 bg-purple-50 shadow-lg'
-                      : 'border-gray-200 bg-gray-50 hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{drink.icon}</span>
-                    <div>
-                      <div className="font-semibold text-gray-800">{drink.name}</div>
-                      <div className="text-xs text-gray-600">{drink.percentage}%</div>
-                    </div>
-                  </div>
-                </button>
-
-                {drink.isCustom && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {/* Coluna DE */}
+        <div>
+          <h2 className="text-2xl font-bold text-purple-600 mb-4">De:</h2>
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+            {drinks.map((drink) => {
+              const isSelected = fromDrink?.id === drink.id;
+              return (
+                <div key={drink.id} className="relative group">
                   <button
-                    onClick={() => handleDeleteDrink(drink.id)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => selectDrink(drink, 'from')}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      isSelected
+                        ? 'border-purple-500 bg-purple-100'
+                        : 'border-gray-300 bg-gray-50 hover:border-purple-400'
+                    }`}
                   >
-                    <X className="w-4 h-4" />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-800">{drink.icon} {drink.name}</p>
+                        <p className="text-sm text-gray-600">{drink.percentage}% de álcool</p>
+                      </div>
+                      {isSelected && <div className="w-3 h-3 bg-purple-500 rounded-full"></div>}
+                    </div>
                   </button>
-                )}
-              </div>
-            ))}
+                  {drink.isCustom && (
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                      <button
+                        onClick={() => handleEditClick(drink)}
+                        className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDrink(drink.id)}
+                        className="p-1 bg-red-500 text-white rounded hover:bg-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Volume (ml)</label>
+          {/* Volume Input */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Volume (ml):</label>
             <input
               type="number"
-              value={fromVolume}
-              onChange={(e) => setFromVolume(Number(e.target.value))}
-              className="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:outline-none"
-              min="1"
+              value={volume}
+              onChange={(e) => setVolume(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Ex: 150"
             />
           </div>
 
-          <div className="p-4 bg-purple-50 rounded-xl border-2 border-purple-200">
-            <div className="text-xs text-purple-700 font-medium">Álcool puro:</div>
-            <div className="text-2xl font-bold text-purple-600 mt-1">
-              {fromDrink && calculatePureAlcohol(fromVolume, fromDrink.percentage).toFixed(2)} ml
+          {/* Álcool Puro Preview (CORRIGIDO) */}
+          {fromDrink && volume && (
+            <div className="mt-3">
+              <input
+                type="text"
+                value={
+                  (parseFloat(volume) * (fromDrink.percentage / 100)).toFixed(1) + ' ml de álcool puro'
+                }
+                readOnly
+                className="w-full px-4 py-3 border-2 border-purple-300 rounded-lg bg-purple-50 text-lg font-semibold text-purple-800"
+              />
             </div>
-          </div>
+          )}
         </div>
 
-        {/* COLUNA PARA: */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-1 h-8 bg-gradient-to-b from-cyan-500 to-cyan-400 rounded-full"></div>
-            <h2 className="text-2xl font-bold text-gray-800">Para:</h2>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 max-h-64 overflow-y-auto pr-2 rounded-xl border-2 border-cyan-300 p-3 bg-cyan-50">
-            {drinks.map(drink => (
-              <div key={drink.id} className="relative group">
-                <button
-                  onClick={() => selectDrink(drink, 'to')}
-                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                    toDrink?.id === drink.id
-                      ? 'border-cyan-500 bg-white shadow-lg'
-                      : 'border-gray-200 bg-gray-50 hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{drink.icon}</span>
-                    <div>
-                      <div className="font-semibold text-gray-800">{drink.name}</div>
-                      <div className="text-xs text-gray-600">{drink.percentage}%</div>
-                    </div>
-                  </div>
-                </button>
-
-                {drink.isCustom && (
+        {/* Coluna PARA */}
+        <div>
+          <h2 className="text-2xl font-bold text-cyan-600 mb-4">Para:</h2>
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+            {drinks.map((drink) => {
+              const isSelected = toDrink?.id === drink.id;
+              return (
+                <div key={drink.id} className="relative group">
                   <button
-                    onClick={() => handleDeleteDrink(drink.id)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => selectDrink(drink, 'to')}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      isSelected
+                        ? 'border-cyan-500 bg-cyan-100'
+                        : 'border-gray-300 bg-gray-50 hover:border-cyan-400'
+                    }`}
                   >
-                    <X className="w-4 h-4" />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-800">{drink.icon} {drink.name}</p>
+                        <p className="text-sm text-gray-600">{drink.percentage}% de álcool</p>
+                      </div>
+                      {isSelected && <div className="w-3 h-3 bg-cyan-500 rounded-full"></div>}
+                    </div>
                   </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Álcool puro</label>
-            <input
-              type="text"
-              value={toDrink ? `${calculatePureAlcohol(toVolume, toDrink.percentage).toFixed(2)} ml` : ''}
-              readOnly
-              className="w-full px-4 py-3 border-2 border-cyan-300 rounded-xl bg-gray-50"
-            />
+                  {drink.isCustom && (
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                      <button
+                        onClick={() => handleEditClick(drink)}
+                        className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDrink(drink.id)}
+                        className="p-1 bg-red-500 text-white rounded hover:bg-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* BOTÃO CALCULAR */}
+      {/* Gênero Selection */}
+      <div className="mb-6 bg-white p-4 rounded-lg border-2 border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <Users className="w-5 h-5" />
+          Gênero:
+        </h3>
+        <div className="flex gap-6">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="radio"
+              name="gender"
+              value="male"
+              checked={gender === 'male'}
+              onChange={() => setGender('male')}
+              className="mr-2 w-4 h-4"
+            />
+            <span className="text-gray-700 font-medium">Masculino</span>
+          </label>
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="radio"
+              name="gender"
+              value="female"
+              checked={gender === 'female'}
+              onChange={() => setGender('female')}
+              className="mr-2 w-4 h-4"
+            />
+            <span className="text-gray-700 font-medium">Feminino</span>
+          </label>
+        </div>
+      </div>
+
+      {/* Botão Calcular */}
       <button
         onClick={handleCalculate}
-        className="w-full bg-gradient-to-r from-purple-600 via-purple-500 to-cyan-500 text-white font-bold rounded-full py-3 px-6 hover:shadow-lg transition-all flex items-center justify-center gap-2 mb-8 text-lg"
+        disabled={isCalculating}
+        className={`w-full py-4 px-6 rounded-lg font-bold text-lg transition-all ${
+          isCalculating
+            ? 'bg-gray-400 text-white cursor-not-allowed'
+            : 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white hover:from-purple-700 hover:to-cyan-700 shadow-lg hover:shadow-xl transform hover:scale-105'
+        }`}
       >
-        <CalcIcon className="w-6 h-6" />
-        Calcular Equivalência
+        <CalcIcon className="inline mr-2 w-5 h-5" />
+        {isCalculating ? 'Calculando...' : 'Calcular Equivalência'}
       </button>
 
-      {/* RESULTADO */}
-      {result && (
-        <div className="p-8 bg-gradient-to-br from-purple-50 via-gray-50 to-cyan-50 rounded-2xl border-2 border-gray-200">
-          <div className="flex items-center justify-center gap-4 flex-wrap mb-6">
-            <div className="text-center">
-              <div className="text-4xl mb-2">{result.from.icon}</div>
-              <div className="font-semibold text-gray-800">{result.from.volume}ml</div>
-              <div className="text-xs text-gray-600">{result.from.name}</div>
+      {/* Botão Adicionar Bebida */}
+      <button
+        onClick={() => {
+          setShowAddDrink(!showAddDrink);
+          setEditingDrink(null);
+          setNewDrink({ name: '', percentage: '', icon: '🍺', caloriesPer100ml: '' });
+        }}
+        className="w-full mt-4 py-3 px-6 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+      >
+        <Plus className="w-5 h-5" />
+        {showAddDrink ? 'Cancelar' : 'Adicionar Bebida Personalizada'}
+      </button>
+
+      {/* Modal Adicionar Bebida */}
+      {showAddDrink && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">
+                {editingDrink ? 'Editar Bebida' : 'Adicionar Bebida'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowAddDrink(false);
+                  setEditingDrink(null);
+                  setNewDrink({ name: '', percentage: '', icon: '🍺', caloriesPer100ml: '' });
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
 
-            <ArrowRight className="w-6 h-6 text-gray-400" />
-
-            <div className="bg-gradient-to-r from-purple-600 to-cyan-500 text-white px-8 py-4 rounded-2xl shadow-lg">
-              <div className="text-4xl font-black">{result.equivalence}</div>
-              <div className="text-sm font-medium">unidades</div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Bebida:</label>
+                <input
+                  type="text"
+                  value={newDrink.name}
+                  onChange={(e) => setNewDrink({ ...newDrink, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Ex: Cerveja Artesanal"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Porcentagem de Álcool (%):</label>
+                <input
+                  type="number"
+                  value={newDrink.percentage}
+                  onChange={(e) => setNewDrink({ ...newDrink, percentage: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Ex: 5.5"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ícone (Emoji):</label>
+                <input
+                  type="text"
+                  value={newDrink.icon}
+                  onChange={(e) => setNewDrink({ ...newDrink, icon: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Ex: 🍻"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Calorias por 100ml (opcional):</label>
+                <input
+                  type="number"
+                  value={newDrink.caloriesPer100ml}
+                  onChange={(e) => setNewDrink({ ...newDrink, caloriesPer100ml: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Ex: 45 (se vazio, será estimado)"
+                />
+              </div>
+              <button
+                onClick={handleAddDrink}
+                className="w-full py-3 px-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors"
+              >
+                {editingDrink ? 'Salvar Alterações' : 'Adicionar Bebida'}
+              </button>
             </div>
-
-            <ArrowRight className="w-6 h-6 text-gray-400" />
-
-            <div className="text-center">
-              <div className="text-4xl mb-2">{result.to.icon}</div>
-              <div className="font-semibold text-gray-800">{result.to.volume}ml</div>
-              <div className="text-xs text-gray-600">{result.to.name}</div>
-            </div>
-          </div>
-
-          <div className="text-center p-4 bg-white rounded-xl border border-gray-200">
-            <p className="text-sm text-gray-700">
-              Contém aproximadamente <span className="font-bold text-purple-600">{result.pureAlcohol}ml</span> de álcool puro
-            </p>
           </div>
         </div>
       )}
     </div>
   );
-};
-
-export default Calculator;
-
+}
 

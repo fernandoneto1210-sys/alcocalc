@@ -1,38 +1,35 @@
-// Calcular álcool puro em ml
-export const calculatePureAlcohol = (volume, percentage) => {
-  return (volume * percentage) / 100;
-};
+// src/utils/alcoholCalculations.js
+export function calculateEquivalence(volume, fromDrink, toDrink, gender) {
+  const alcoholDensity = 0.789; // g/ml
+  const standardDose = 14; // gramas de álcool por dose padrão nos EUA
 
-// Calcular equivalência entre bebidas
-export const calculateEquivalence = (
-  volumeFrom,
-  percentageFrom,
-  volumeTo,
-  percentageTo
-) => {
-  const pureAlcoholFrom = calculatePureAlcohol(volumeFrom, percentageFrom);
-  const pureAlcoholTo = calculatePureAlcohol(volumeTo, percentageTo);
+  const fromCaloriesPer100ml = fromDrink.caloriesPer100ml ? parseFloat(fromDrink.caloriesPer100ml) : 0;
+  const toCaloriesPer100ml = toDrink.caloriesPer100ml ? parseFloat(toDrink.caloriesPer100ml) : 0;
 
-  return pureAlcoholFrom / pureAlcoholTo;
-};
+  const alcoholGramsFrom = (volume * (fromDrink.percentage / 100)) * alcoholDensity;
 
-// Calcular total de álcool puro consumido
-export const calculateTotalAlcohol = (drinks) => {
-  return drinks.reduce((total, drink) => {
-    return total + calculatePureAlcohol(drink.volume, drink.percentage);
-  }, 0);
-};
+  const equivalentVolumeTo = (alcoholGramsFrom / alcoholDensity) / (toDrink.percentage / 100);
 
-// Verificar limite seguro (OMS: max 40g álcool/dia homens, 20g mulheres)
-// 1ml álcool puro ≈ 0.789g
-export const checkSafetyLimit = (totalAlcoholMl, gender = 'male') => {
-  const alcoholGrams = totalAlcoholMl * 0.789;
-  const limit = gender === 'male' ? 40 : 20;
+  const dosesFrom = alcoholGramsFrom / standardDose;
+  const dosesTo = (equivalentVolumeTo * (toDrink.percentage / 100) * alcoholDensity) / standardDose;
+
+  const caloriesFrom = (volume / 100) * fromCaloriesPer100ml;
+  const caloriesTo = (equivalentVolumeTo / 100) * toCaloriesPer100ml;
+
+  const weight = gender === 'male' ? 70000 : 60000; // em gramas
+  const rFactor = gender === 'male' ? 0.68 : 0.55;
+  const bac = (alcoholGramsFrom / (weight * rFactor)) * 100;
+
+  const metabolismRate = 0.015; // % por hora
+  const metabolismTime = bac > 0 ? bac / metabolismRate : 0;
 
   return {
-    grams: alcoholGrams.toFixed(1),
-    limit,
-    isWithinLimit: alcoholGrams <= limit,
-    percentage: ((alcoholGrams / limit) * 100).toFixed(0)
+    equivalentVolumeTo,
+    dosesFrom,
+    dosesTo,
+    caloriesFrom,
+    caloriesTo,
+    bac,
+    metabolismTime
   };
-};
+}
